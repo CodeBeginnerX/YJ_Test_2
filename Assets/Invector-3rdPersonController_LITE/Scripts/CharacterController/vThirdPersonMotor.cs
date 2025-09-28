@@ -34,12 +34,7 @@ namespace Invector.vCharacterController
         public float dashDuration = 0.2f;
         [Tooltip("Spacing between the square markers spawned along the dash path.")]
         public float dashMarkerSpacing = 0.5f;
-        [Tooltip("Vertical offset applied to each dash marker to control its height above the path.")]
-        public float dashMarkerHeightOffset = 0f;
-        [Tooltip("Local scale of the dash marker geometry.")]
-        public Vector3 dashMarkerScale = new Vector3(0.3f, 0.3f, 0.3f);
-        [Tooltip("Tint color applied to the dash marker geometry.")]
-        public Color dashMarkerColor = Color.cyan;
+
 
         [Header("- Airborne")]
 
@@ -257,8 +252,9 @@ namespace Invector.vCharacterController
         /// </summary>
         public virtual void Dash()
         {
-            // Prevent overlapping dash requests while allowing the skill to trigger on the ground or in the air.
-            if (isDashing)
+
+
+            if (isDashing || !isGrounded)
                 return;
 
             // Ensure only a single dash routine runs at a time.
@@ -278,30 +274,23 @@ namespace Invector.vCharacterController
             lockRotation = true;
 
             Vector3 startPosition = _rigidbody.position;
-            Vector3 dashDirection = new Vector3(transform.forward.x, 0f, transform.forward.z);
-            if (dashDirection.sqrMagnitude < 0.0001f)
-                dashDirection = transform.forward.y >= 0f ? Vector3.forward : Vector3.back;
-            dashDirection.Normalize();
+            Vector3 dashDirection = transform.forward.normalized;
             Vector3 targetPosition = startPosition + dashDirection * dashDistance;
 
-            Vector3 dashVelocity = dashDirection * (dashDistance / Mathf.Max(dashDuration, 0.0001f));
-            dashVelocity.y = 0f;
+            _rigidbody.velocity = Vector3.zero;
 
             float elapsedTime = 0f;
             while (elapsedTime < dashDuration)
             {
-                Vector3 velocity = _rigidbody.velocity;
-                velocity.x = dashVelocity.x;
-                velocity.z = dashVelocity.z;
-                _rigidbody.velocity = velocity;
+                float normalizedTime = Mathf.Clamp01(elapsedTime / dashDuration);
+                Vector3 interpolatedPosition = Vector3.Lerp(startPosition, targetPosition, normalizedTime);
+                _rigidbody.MovePosition(interpolatedPosition);
                 elapsedTime += Time.deltaTime;
                 yield return null;
             }
 
-            Vector3 finalVelocity = _rigidbody.velocity;
-            finalVelocity.x = 0f;
-            finalVelocity.z = 0f;
-            _rigidbody.velocity = finalVelocity;
+            _rigidbody.MovePosition(targetPosition);
+            _rigidbody.velocity = Vector3.zero;
 
             SpawnDashMarkers(startPosition, targetPosition);
 
@@ -326,14 +315,9 @@ namespace Invector.vCharacterController
 
                 GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 marker.name = "DashMarker";
-                marker.transform.position = markerPosition + Vector3.up * dashMarkerHeightOffset;
-                marker.transform.localScale = dashMarkerScale;
+                marker.transform.position = markerPosition;
+                marker.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
 
-                Renderer markerRenderer = marker.GetComponent<Renderer>();
-                if (markerRenderer != null)
-                {
-                    markerRenderer.material.color = dashMarkerColor;
-                }
             }
         }
 
