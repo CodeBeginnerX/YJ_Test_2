@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+using System.Collections;
+using UnityEngine;
 
 namespace Invector.vCharacterController
 {
@@ -25,6 +26,14 @@ namespace Invector.vCharacterController
         public LocomotionType locomotionType = LocomotionType.FreeWithStrafe;
 
         public vMovementSpeed freeSpeed, strafeSpeed;
+
+        [Header("- Dash")]
+        [Tooltip("The straight-line distance the character covers when performing a dash.")]
+        public float dashDistance = 5f;
+        [Tooltip("The amount of time (in seconds) that the dash movement should take.")]
+        public float dashDuration = 0.2f;
+        [Tooltip("Spacing between the square markers spawned along the dash path.")]
+        public float dashMarkerSpacing = 0.5f;
 
         [Header("- Airborne")]
 
@@ -95,7 +104,9 @@ namespace Invector.vCharacterController
         internal float groundDistance;                      // used to know the distance from the ground
         internal RaycastHit groundHit;                      // raycast to hit the ground 
         internal bool lockMovement = false;                 // lock the movement of the controller (not the animation)
-        internal bool lockRotation = false;                 // lock the rotation of the controller (not the animation)        
+        internal bool lockRotation = false;                 // lock the rotation of the controller (not the animation)
+        internal bool isDashing = false;                    // flag to avoid overlapping dash actions
+        internal Coroutine dashRoutine = null;              // reference to the running dash routine
         internal bool _isStrafing;                          // internally used to set the strafe movement                
         internal Transform rotateTarget;                    // used as a generic reference for the camera.transform
         internal Vector3 input;                             // generate raw input for the controller
@@ -168,7 +179,7 @@ namespace Invector.vCharacterController
             // calculate input smooth
             inputSmooth = Vector3.Lerp(inputSmooth, input, (isStrafing ? strafeSpeed.movementSmooth : freeSpeed.movementSmooth) * Time.deltaTime);
 
-            if (!isGrounded || isJumping) return;
+            if (!isGrounded || isJumping || isDashing) return;
 
             _direction.y = 0;
             _direction.x = Mathf.Clamp(_direction.x, -1f, 1f);
@@ -229,6 +240,81 @@ namespace Invector.vCharacterController
             Vector3 desiredForward = Vector3.RotateTowards(transform.forward, direction.normalized, rotationSpeed * Time.deltaTime, .1f);
             Quaternion _newRotation = Quaternion.LookRotation(desiredForward);
             transform.rotation = _newRotation;
+        }
+
+        #endregion
+
+        #region Dash Methods
+
+        /// <summary>
+        /// Public entry point triggered by the input component to start a dash.
+        /// </summary>
+        public virtual void Dash()
+        {
+            if (isDashing || !isGrounded)
+                return;
+
+            // Ensure only a single dash routine runs at a time.
+            if (dashRoutine != null)
+                StopCoroutine(dashRoutine);
+
+            dashRoutine = StartCoroutine(DashRoutine());
+        }
+
+        /// <summary>
+        /// Coroutine that moves the character forward over a short period while locking their controls.
+        /// </summary>
+        protected virtual IEnumerator DashRoutine()
+        {
+            isDashing = true;
+            lockMovement = true;
+            lockRotation = true;
+
+            Vector3 startPosition = _rigidbody.position;
+            Vector3 dashDirection = transform.forward.normalized;
+            Vector3 targetPosition = startPosition + dashDirection * dashDistance;
+
+            _rigidbody.velocity = Vector3.zero;
+
+            float elapsedTime = 0f;
+            while (elapsedTime < dashDuration)
+            {
+                float normalizedTime = Mathf.Clamp01(elapsedTime / dashDuration);
+                Vector3 interpolatedPosition = Vector3.Lerp(startPosition, targetPosition, normalizedTime);
+                _rigidbody.MovePosition(interpolatedPosition);
+                elapsedTime += Time.deltaTime;
+                yield return null;
+            }
+
+            _rigidbody.MovePosition(targetPosition);
+            _rigidbody.velocity = Vector3.zero;
+
+            SpawnDashMarkers(startPosition, targetPosition);
+
+            lockMovement = false;
+            lockRotation = false;
+            isDashing = false;
+            dashRoutine = null;
+        }
+
+        /// <summary>
+        /// Spawns cube primitives along the dash path to highlight the travelled distance.
+        /// </summary>
+        protected virtual void SpawnDashMarkers(Vector3 startPosition, Vector3 endPosition)
+        {
+            float pathDistance = Vector3.Distance(startPosition, endPosition);
+            int markerCount = Mathf.Max(1, Mathf.CeilToInt(pathDistance / Mathf.Max(dashMarkerSpacing, 0.01f)));
+
+            for (int i = 0; i <= markerCount; i++)
+            {
+                float normalizedStep = markerCount == 0 ? 0f : (float)i / markerCount;
+                Vector3 markerPosition = Vector3.Lerp(startPosition, endPosition, normalizedStep);
+
+                GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                marker.name = "DashMarker";
+                marker.transform.position = markerPosition;
+                marker.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
+            }
         }
 
         #endregion
