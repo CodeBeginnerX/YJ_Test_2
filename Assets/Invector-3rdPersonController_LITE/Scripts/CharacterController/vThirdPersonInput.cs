@@ -12,6 +12,7 @@ namespace Invector.vCharacterController
         public KeyCode jumpInput = KeyCode.Space;
         public KeyCode strafeInput = KeyCode.Tab;
         public KeyCode sprintInput = KeyCode.LeftShift;
+        public KeyCode dashInput = KeyCode.E;
 
         [Header("Camera Input")]
         public string rotateCameraXInput = "Mouse X";
@@ -79,6 +80,7 @@ namespace Invector.vCharacterController
             SprintInput();
             StrafeInput();
             JumpInput();
+            DashInput();
         }
 
         public virtual void MoveInput()
@@ -125,6 +127,15 @@ namespace Invector.vCharacterController
                 cc.Sprint(true);
             else if (Input.GetKeyUp(sprintInput))
                 cc.Sprint(false);
+        }
+
+        /// <summary>
+        /// Input to trigger the dash behaviour.
+        /// </summary>
+        protected virtual void DashInput()
+        {
+            if (Input.GetKeyDown(dashInput))
+                cc.Dash();
         }
 
         /// <summary>
