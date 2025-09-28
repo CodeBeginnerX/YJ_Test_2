@@ -35,6 +35,7 @@ namespace Invector.vCharacterController
         [Tooltip("Spacing between the square markers spawned along the dash path.")]
         public float dashMarkerSpacing = 0.5f;
 
+
         [Header("- Airborne")]
 
         [Tooltip("Use the currently Rigidbody Velocity to influence on the Jump Distance")]
@@ -251,6 +252,8 @@ namespace Invector.vCharacterController
         /// </summary>
         public virtual void Dash()
         {
+
+
             if (isDashing || !isGrounded)
                 return;
 
@@ -314,6 +317,7 @@ namespace Invector.vCharacterController
                 marker.name = "DashMarker";
                 marker.transform.position = markerPosition;
                 marker.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
+
             }
         }
 
